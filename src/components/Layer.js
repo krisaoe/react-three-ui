@@ -5,10 +5,39 @@ import ThreeUIComponent from './ThreeUIComponent';
 import THREE from 'three';
 import { Mesh } from 'react-three';
 import Color from 'color';
+import { Motion, spring } from 'react-motion';
+import computeLayout from 'css-layout';
+
+const animatableProperties = {
+  height: true,
+  width: true,
+  // minWidth: true,
+  // maxWidth: true,
+  left: true,
+  right: true,
+  top: true,
+  bottom: true,
+  // margin: true,
+  // marginLeft: true,
+  // marginRight: true,
+  // marginTop: true,
+  // marginBottom: true,
+  // padding: true,
+  // paddingLeft: true,
+  // paddingRight: true,
+  // paddingTop: true,
+  // paddingBottom: true,
+  // borderWidth: true,
+  // borderLeftWidth: true,
+  // borderRightWidth: true,
+  // borderTopWidth: true,
+  // borderBottomWidth: true
+};
 
 export default class Layer extends ThreeUIComponent {
   
   static propTypes = {
+    animate: PropTypes.object,
     style: PropTypes.shape({
       alignItems: PropTypes.oneOf(['flex-start', 'center', 'flex-end', 'stretch']),
       alignSelf: PropTypes.oneOf(['flex-start', 'center', 'flex-end', 'stretch']),
@@ -25,6 +54,7 @@ export default class Layer extends ThreeUIComponent {
   };
   
   static defaultProps = {
+    animate: null,
     style: {
       flex: 0,
       flexDirection: 'column',
@@ -35,13 +65,30 @@ export default class Layer extends ThreeUIComponent {
     elevation: 0
   };
   
-  getGeometry() {
-    const { css } = this.props;
-    return new THREE.PlaneGeometry(css.layout.width, css.layout.height);
+  constructor(props) {
+    super(props);
+    this.state = {
+      oldAnimations: props.css.layout,
+      newAnimations: props.animate
+    };
   }
   
-  getMaterial() {
-    let { style } = this.props;
+  componentWillReceiveProps(nextProps) {
+    this.setState({
+      oldAnimations: this.state.newAnimations,
+      newAnimations: nextProps.animate
+    });
+  }
+  
+  getGeometry(layoutChanges) {
+    const layout = {
+      ...this.props.css.layout,
+      ...layoutChanges
+    }
+    return new THREE.PlaneGeometry(layout.width, layout.height);
+  }
+  
+  getMaterial(style) {
     style = {
       ...Layer.defaultProps.style,
       ...style
@@ -61,31 +108,51 @@ export default class Layer extends ThreeUIComponent {
     return material;
   }
   
-  getPosition() {
-    const { parentLayout, css } = this.props;
-    const leftBound = (css.layout.width - parentLayout.width) / 2;
-    const topBound = (parentLayout.height - css.layout.height) / 2;
-    return new THREE.Vector3(leftBound + css.layout.left, topBound - css.layout.top, this.props.elevation);
+  getPosition(layoutChanges) {
+    const { parentCSS, css } = this.props;
+    const layout = {
+      ...css.layout,
+      ...layoutChanges
+    };
+    const leftBound = (layout.width - parentCSS.layout.width) / 2;
+    const topBound = (parentCSS.layout.height - layout.height) / 2;
+    return new THREE.Vector3(leftBound + layout.left, topBound - layout.top, this.props.elevation);
   }
   
   getChildren() {
     const { children, css } = this.props;
     return React.Children.map(children, (child, i) => React.cloneElement(child, {
-      parent: this,
-      parentLayout: css.layout,
+      parentCSS: css,
       css: css.children[i]
     }));
   }
   
-  render() {
+  renderMesh(layoutChanges) {
     return (
       <Mesh
         name={this.props.name}
-        geometry={this.getGeometry()}
-        material={this.getMaterial()}
-        position={this.getPosition()}>
+        geometry={this.getGeometry(layoutChanges)}
+        material={this.getMaterial(this.props.style)}
+        position={this.getPosition(layoutChanges)}>
         {this.getChildren()}
       </Mesh>
     );
+  }
+  
+  render() {
+    if (this.props.animate) {
+      const animatedLayout = Object.keys(this.state.newAnimations)
+        .filter(key => animatableProperties[key])
+        .reduce((memo, key) => (memo[key] = spring(this.state.newAnimations[key]), memo), {});
+        
+      return (
+        <Motion defaultStyle={this.state.oldAnimations} style={animatedLayout}>
+          {this.renderMesh.bind(this)}
+        </Motion>
+      );
+    }
+    else {
+      return this.renderMesh();
+    }
   }
 }

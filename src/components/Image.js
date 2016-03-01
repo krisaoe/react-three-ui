@@ -8,9 +8,10 @@ import Color from 'color';
 
 export default class Image extends Layer {
   
-  constructor() {
-    super();
+  constructor(props) {
+    super(props);
     this.state = {
+      ...this.state,
       image: null
     };
   }
@@ -40,17 +41,5 @@ export default class Image extends Layer {
       material.map = texture;
     }
     return material;
-  }
-  
-  render() {
-    return (
-      <Mesh
-        name={this.props.name}
-        geometry={this.getGeometry()}
-        material={this.getMaterial()}
-        position={this.getPosition()}>
-        {this.getChildren()}
-      </Mesh>
-    );
   }
 }

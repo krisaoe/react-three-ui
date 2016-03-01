@@ -93,7 +93,7 @@ export default class Text extends ThreeUIComponent {
   }
   
   render() {
-    let { antiAlias, parent, parentLayout, style, css } = this.props;
+    let { antiAlias, style, css } = this.props;
     style = {
       ...Text.defaultProps.style,
       ...style

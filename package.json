@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "color": "^0.11.1",
-    "css-layout": "^1.1.1"
+    "css-layout": "^1.1.1",
+    "react-motion": "^0.4.2"
   }
 }

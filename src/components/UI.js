@@ -7,7 +7,7 @@ import { Object3D } from 'react-three';
 import computeLayout from 'css-layout';
 
 function buildStyleTree(node) {
-  if (typeof node !== 'object') return null;
+  if (typeof node !== 'object' || !node.type) return null;
   if (!node.type.isThreeUIComponent) {
     // Naive implementation where if a child of a Layer is not a ThreeUIComponent
     // we'll try to use a child that is a ThreeUIComponent
@@ -50,6 +50,9 @@ export default class UI extends ThreeUIComponent {
   
   render() {
     const styleTree = buildStyleTree({
+      type: {
+        isThreeUIComponent: true
+      },
       props: {
         style: {
           height: this.props.height,
@@ -62,8 +65,7 @@ export default class UI extends ThreeUIComponent {
     const { layout } = styleTree;
     const children = React.Children.map(this.props.children, (child, i) => {
         return React.cloneElement(child, {
-          parent: this,
-          parentLayout: styleTree.layout,
+          parentCSS: styleTree,
           css: styleTree.children[i]
         });
     });
