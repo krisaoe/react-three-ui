@@ -1,5 +1,6 @@
 # react-three-ui
 ##### Note: this is very much experimental in its current state and performance is bad to say the least.
+React Three UI is an exploration into the creation of React UIs in 3D space.
 
 ### Wait, what?
 First off, an explanation: Typically you'd just want to add a React UI on top of canvas as a separate layer in the DOM. The goal of react-three-ui is to provide functionality for building UIs *in 3D space* using plain old React. The majority of the heavy lifting here is done by [React Three](https://github.com/Izzimach/react-three).
