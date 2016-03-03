@@ -34,6 +34,8 @@ export default class Text extends ThreeUIComponent {
     super();
   }
   
+  static isThreeUIDisplayComponent = true;
+  
   static contextTypes = {
     ppu: PropTypes.number.isRequired
   };
@@ -68,7 +70,8 @@ export default class Text extends ThreeUIComponent {
   
   drawText(text) {
     const ppu = this.context.ppu;
-    let { layout, style } = this.props;
+    let { style } = this.props;
+    const layout = this.props.layout.toObject();
     style = {
       ...Text.defaultProps.style,
       ...style
@@ -93,7 +96,8 @@ export default class Text extends ThreeUIComponent {
   }
   
   render() {
-    let { antiAlias, style, layout } = this.props;
+    let { antiAlias, style } = this.props;
+    const layout = this.props.layout.toObject();
     style = {
       ...Text.defaultProps.style,
       ...style

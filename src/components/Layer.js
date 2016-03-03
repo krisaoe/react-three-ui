@@ -36,12 +36,17 @@ const animatableProperties = {
 
 export default class Layer extends ThreeUIComponent {
   
+  static isThreeUIDisplayComponent = true;
+  
   static contextTypes = {
     computeLayout: PropTypes.func.isRequired
   };
   
   static propTypes = {
-    animation: PropTypes.object,
+    animation: PropTypes.oneOfType([
+      PropTypes.bool,
+      PropTypes.object
+    ]),
     style: PropTypes.shape({
       alignItems: PropTypes.oneOf(['flex-start', 'center', 'flex-end', 'stretch']),
       alignSelf: PropTypes.oneOf(['flex-start', 'center', 'flex-end', 'stretch']),
@@ -73,9 +78,9 @@ export default class Layer extends ThreeUIComponent {
     super(props);
     this.state = {
       geometry: new THREE.PlaneGeometry(0, 0),
-      material: new THREE.MeshBasicMaterial(),
-      position: new THREE.Vector3(0, 0, 0)
+      material: new THREE.MeshBasicMaterial()
     };
+    this.position = new THREE.Vector3(0, 0, 0);
   }
   
   componentWillMount() {
@@ -167,31 +172,26 @@ export default class Layer extends ThreeUIComponent {
     
     const leftBound = (layout.width - parentLayout.width) / 2;
     const topBound = (parentLayout.height - layout.height) / 2;
-    this.setState({
-      position: new THREE.Vector3(leftBound + layout.left, topBound - layout.top, props.elevation)
-    });
+    this.position.set(leftBound + layout.left, topBound - layout.top, props.elevation);
   }
   
   getChildren() {
-    const { children, layout, layoutChildren } = this.props;
+    const { children, layout, layoutChildren, animation } = this.props;
     return React.Children.map(children, (child, i) => React.cloneElement(child, {
       parentLayout: layout,
+      animation,
       layout: Immutable.Map(layoutChildren[i].layout),
       layoutChildren: layoutChildren[i].children
     }));
   }
   
-  render() {
-    if (!this.props.layout) {
-      return null;
-    }
-    
+  render() {    
     return (
       <Mesh
         name={this.props.name}
         geometry={this.state.geometry}
         material={this.state.material}
-        position={this.state.position}>
+        position={this.position}>
         {this.getChildren()}
       </Mesh>
     );

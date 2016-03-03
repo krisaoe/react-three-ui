@@ -9,12 +9,7 @@ import computeLayout from 'css-layout';
 import Immutable from 'immutable';
 
 function buildStyleTree(node) {
-  if (typeof node !== 'object' || !node.type) return null;
-  if (!node.type.isThreeUIComponent) {
-    // Naive implementation where if a child of a Layer is not a ThreeUIComponent
-    // we'll try to use a child that is a ThreeUIComponent
-    child = React.Children.toArray(node.props.children).find(c => c.type.isThreeUIComponent);
-  }
+  if (!node || !node.type || node.type.isThreeUIPointerComponent) return null;
   return {
     style: {
       ...node.props.style
@@ -26,18 +21,27 @@ function buildStyleTree(node) {
 export default class UI extends ThreeUIComponent {
   
   static propTypes = {
+    children: PropTypes.element.isRequired,
     ppu: PropTypes.number.isRequired,
     height: PropTypes.number.isRequired,
     width: PropTypes.number.isRequired,
     position: PropTypes.instanceOf(THREE.Vector3),
     rotation: PropTypes.instanceOf(THREE.Euler),
-    scale: PropTypes.instanceOf(THREE.Vector3)
+    scale: PropTypes.instanceOf(THREE.Vector3),
+    pointers: PropTypes.arrayOf(PropTypes.shape({
+      name: PropTypes.string.isRequired,
+      quaternion: PropTypes.instanceOf(THREE.Quaternion),
+      position: PropTypes.instanceOf(THREE.Vector3)
+    })),
+    onPointerIntersect: PropTypes.func
   };
   
   static defaultProps = {
     position: new THREE.Vector3(0, 0, 0),
     rotation: new THREE.Euler(),
-    scale: new THREE.Vector3(1, 1, 1)
+    scale: new THREE.Vector3(1, 1, 1),
+    pointers: [],
+    onPointerIntersect: () => {}
   };
   
   static childContextTypes = {
@@ -47,6 +51,7 @@ export default class UI extends ThreeUIComponent {
   
   constructor(props) {
     super(props);
+    this.raycasters = {};
     this.state = {
       styleTree: buildStyleTree({
         type: {
@@ -64,8 +69,33 @@ export default class UI extends ThreeUIComponent {
     computeLayout(this.state.styleTree);
   }
   
+  componentWillReceiveProps(nextProps) {
+    nextProps.pointers.forEach(pointer => {
+      if (!this.raycasters[pointer.name]) {
+        this.raycasters[pointer.name] = new THREE.Raycaster();
+      }
+    });
+    Object.keys(this.raycasters).forEach(key => {
+      if (!nextProps.pointers.find(p => p.name === key)) {
+        delete this.raycasters[key];
+      }
+    });
+  }
+  
   animate(time) {
     TWEEN.update(time);
+    const that = this;
+    if (this.refs.ui) {
+      this.props.pointers.forEach(pointer => {
+        const raycaster = that.raycasters[pointer.name];
+        if (!raycaster) return; // Raycaster has not been instantiated yet
+        raycaster.set(pointer.position, pointer.quaternion);
+        const intersects = raycaster.intersectObject(that.refs.ui, true);
+        if (intersects.length > 0) {
+          that.props.onPointerIntersect(intersects[0]);
+        }
+      });
+    }
   }
   
   computeLayout() {
@@ -94,28 +124,27 @@ export default class UI extends ThreeUIComponent {
   
   render() {
     const { layout, children: layoutChildren } = this.state.styleTree;
-    const children = React.Children.map(this.props.children, (child, i) => {
-        return React.cloneElement(child, {
-          parentLayout: Immutable.Map(layout),
-          layout: Immutable.Map(layoutChildren[i].layout),
-          layoutChildren: layoutChildren[i].children
-        });
-    });
     
     let material = new THREE.MeshBasicMaterial({
       transparent: true
     });
     let geometry = new THREE.PlaneGeometry(layout.width, layout.height);
+    let child = React.cloneElement(this.props.children, {
+      parentLayout: Immutable.Map(layout),
+      layout: Immutable.Map(layoutChildren[0].layout),
+      layoutChildren: layoutChildren[0].children
+    });
     
     return (
       <Object3D
+        ref="ui"
         name={this.props.name}
         geometry={geometry}
         material={material}
         scale={this.props.scale}
         position={this.props.position}
         rotation={this.props.rotation}>
-        {children}
+        {child}
       </Object3D>
     );
   }
