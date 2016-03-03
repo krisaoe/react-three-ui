@@ -3,41 +3,45 @@
 import React, { PropTypes } from 'react';
 import ThreeUIComponent from './ThreeUIComponent';
 import THREE from 'three';
+import TWEEN from 'tween.js';
 import { Mesh } from 'react-three';
 import Color from 'color';
-import { Motion, spring } from 'react-motion';
-import computeLayout from 'css-layout';
+import Immutable from 'immutable';
 
 const animatableProperties = {
   height: true,
   width: true,
-  // minWidth: true,
-  // maxWidth: true,
+  minWidth: true,
+  maxWidth: true,
   left: true,
   right: true,
   top: true,
   bottom: true,
-  // margin: true,
-  // marginLeft: true,
-  // marginRight: true,
-  // marginTop: true,
-  // marginBottom: true,
-  // padding: true,
-  // paddingLeft: true,
-  // paddingRight: true,
-  // paddingTop: true,
-  // paddingBottom: true,
-  // borderWidth: true,
-  // borderLeftWidth: true,
-  // borderRightWidth: true,
-  // borderTopWidth: true,
-  // borderBottomWidth: true
+  margin: true,
+  marginLeft: true,
+  marginRight: true,
+  marginTop: true,
+  marginBottom: true,
+  padding: true,
+  paddingLeft: true,
+  paddingRight: true,
+  paddingTop: true,
+  paddingBottom: true,
+  borderWidth: true,
+  borderLeftWidth: true,
+  borderRightWidth: true,
+  borderTopWidth: true,
+  borderBottomWidth: true
 };
 
 export default class Layer extends ThreeUIComponent {
   
+  static contextTypes = {
+    computeLayout: PropTypes.func.isRequired
+  };
+  
   static propTypes = {
-    animate: PropTypes.object,
+    animation: PropTypes.object,
     style: PropTypes.shape({
       alignItems: PropTypes.oneOf(['flex-start', 'center', 'flex-end', 'stretch']),
       alignSelf: PropTypes.oneOf(['flex-start', 'center', 'flex-end', 'stretch']),
@@ -54,7 +58,7 @@ export default class Layer extends ThreeUIComponent {
   };
   
   static defaultProps = {
-    animate: null,
+    animation: null,
     style: {
       flex: 0,
       flexDirection: 'column',
@@ -68,30 +72,79 @@ export default class Layer extends ThreeUIComponent {
   constructor(props) {
     super(props);
     this.state = {
-      oldAnimations: props.css.layout,
-      newAnimations: props.animate
+      geometry: new THREE.PlaneGeometry(0, 0),
+      material: new THREE.MeshBasicMaterial(),
+      position: new THREE.Vector3(0, 0, 0)
     };
   }
   
+  componentWillMount() {
+    this.updateLayout(this.props);
+  }
+  
   componentWillReceiveProps(nextProps) {
+    const currentStyle = Immutable.Map(this.props.style);
+    const nextStyle = Immutable.Map(nextProps.style);
+    const currentLayout = this.props.layout;
+    const nextLayout = nextProps.layout;
+    const hasStyleChanged = !currentStyle.equals(nextStyle);
+    const hasLayoutChanged = !currentLayout.equals(nextLayout);
+    
+    // Tween from old layout to new layout
+    if (hasLayoutChanged) {
+      const animation = nextProps.animation && nextProps.animation !== true ? nextProps.animation : {};
+      
+      // Ensure layout update happens
+      if (!animation) {
+        // Pass props because this.props will still be old props
+        this.updateLayout(nextProps);
+      }
+      else {
+        const currentLayoutObject = currentLayout.toObject();
+        const nextLayoutObject = nextLayout.toObject();
+        const that = this;
+        const tween = new TWEEN.Tween(currentLayoutObject)
+          .to(nextLayoutObject, animation.duration || 1000)
+          .delay(animation.delay || 0)
+          .easing(animation.easing || TWEEN.Easing.Linear.None)
+          .interpolation(animation.interpolation || TWEEN.Interpolation.Linear)
+          .onUpdate(function() {
+            that.setState({ layoutChanges: this });
+            that.updateLayout(nextProps);
+          })
+          .start();
+      }
+    }
+    // If we have new styles we need to let the root node know so it can compute a new
+    // layout. Once a new layout has been computed, we can animate it, etc.
+    // If/elseif because they can't both happen at the same time.
+    else if (hasStyleChanged) {
+      this.context.computeLayout();
+    }
+  }
+  
+  updateLayout(props) {
+    props = {
+      ...props,
+      layout: props.layout.merge(this.state.layoutChanges)
+    };
+    this.setGeometry(props);
+    this.setPosition(props);
+    this.setMaterial(props);
+  }
+  
+  setGeometry(props) {
+    const layout = props.layout.toObject();
+    
     this.setState({
-      oldAnimations: this.state.newAnimations,
-      newAnimations: nextProps.animate
+      geometry: new THREE.PlaneGeometry(layout.width, layout.height)
     });
   }
   
-  getGeometry(layoutChanges) {
-    const layout = {
-      ...this.props.css.layout,
-      ...layoutChanges
-    }
-    return new THREE.PlaneGeometry(layout.width, layout.height);
-  }
-  
-  getMaterial(style) {
-    style = {
+  setMaterial(props) {
+    const style = {
       ...Layer.defaultProps.style,
-      ...style
+      ...props.style
     };
     const material = new THREE.MeshBasicMaterial();
     if (style.opacity < 1) {
@@ -105,54 +158,42 @@ export default class Layer extends ThreeUIComponent {
     //   material.transparent = true;
     // }
     material.needsUpdate = true;
-    return material;
+    this.setState({ material });
   }
   
-  getPosition(layoutChanges) {
-    const { parentCSS, css } = this.props;
-    const layout = {
-      ...css.layout,
-      ...layoutChanges
-    };
-    const leftBound = (layout.width - parentCSS.layout.width) / 2;
-    const topBound = (parentCSS.layout.height - layout.height) / 2;
-    return new THREE.Vector3(leftBound + layout.left, topBound - layout.top, this.props.elevation);
+  setPosition(props) {
+    const layout = props.layout.toObject();
+    const parentLayout = props.parentLayout.toObject();
+    
+    const leftBound = (layout.width - parentLayout.width) / 2;
+    const topBound = (parentLayout.height - layout.height) / 2;
+    this.setState({
+      position: new THREE.Vector3(leftBound + layout.left, topBound - layout.top, props.elevation)
+    });
   }
   
   getChildren() {
-    const { children, css } = this.props;
+    const { children, layout, layoutChildren } = this.props;
     return React.Children.map(children, (child, i) => React.cloneElement(child, {
-      parentCSS: css,
-      css: css.children[i]
+      parentLayout: layout,
+      layout: Immutable.Map(layoutChildren[i].layout),
+      layoutChildren: layoutChildren[i].children
     }));
   }
   
-  renderMesh(layoutChanges) {
+  render() {
+    if (!this.props.layout) {
+      return null;
+    }
+    
     return (
       <Mesh
         name={this.props.name}
-        geometry={this.getGeometry(layoutChanges)}
-        material={this.getMaterial(this.props.style)}
-        position={this.getPosition(layoutChanges)}>
+        geometry={this.state.geometry}
+        material={this.state.material}
+        position={this.state.position}>
         {this.getChildren()}
       </Mesh>
     );
-  }
-  
-  render() {
-    if (this.props.animate) {
-      const animatedLayout = Object.keys(this.state.newAnimations)
-        .filter(key => animatableProperties[key])
-        .reduce((memo, key) => (memo[key] = spring(this.state.newAnimations[key]), memo), {});
-        
-      return (
-        <Motion defaultStyle={this.state.oldAnimations} style={animatedLayout}>
-          {this.renderMesh.bind(this)}
-        </Motion>
-      );
-    }
-    else {
-      return this.renderMesh();
-    }
   }
 }

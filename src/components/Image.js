@@ -17,19 +17,20 @@ export default class Image extends Layer {
   }
   
   componentWillMount() {
+    super.componentWillMount();
     const loader = new THREE.ImageLoader();
     loader.load(this.props.source, (image) => {
       this.setState({ image });
     });
   }
   
-  getGeometry() {
-    const { css } = this.props;
-    return new THREE.PlaneGeometry(css.layout.width, css.layout.height);
+  componentDidUpdate(prevProps, prevState) {
+    if (this.state.image !== prevState.image) {
+      this.setMaterial(this.props);
+    }
   }
   
-  getMaterial() {
-    const { style } = this.props;
+  setMaterial(props) {
     const material = new THREE.MeshBasicMaterial({
       side: THREE.DoubleSide,
       transparent: true
@@ -40,6 +41,6 @@ export default class Image extends Layer {
       texture.needsUpdate = true;
       material.map = texture;
     }
-    return material;
+    this.setState({ material });
   }
 }

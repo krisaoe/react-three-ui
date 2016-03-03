@@ -68,7 +68,7 @@ export default class Text extends ThreeUIComponent {
   
   drawText(text) {
     const ppu = this.context.ppu;
-    let { css, style } = this.props;
+    let { layout, style } = this.props;
     style = {
       ...Text.defaultProps.style,
       ...style
@@ -81,8 +81,8 @@ export default class Text extends ThreeUIComponent {
 
     // this.canvas.width = this.textWidth;
     // this.canvas.height = this.textHeight;
-    this.canvas.height = ppu * css.layout.height;
-    this.canvas.width = ppu * css.layout.width;
+    this.canvas.height = ppu * layout.height;
+    this.canvas.width = ppu * layout.width;
     
     this.ctx.textAlign = style.textAlign;
     this.ctx.textBaseline = 'top';
@@ -93,12 +93,11 @@ export default class Text extends ThreeUIComponent {
   }
   
   render() {
-    let { antiAlias, style, css } = this.props;
+    let { antiAlias, style, layout } = this.props;
     style = {
       ...Text.defaultProps.style,
       ...style
     };
-    const { layout } = css;
     const text = React.Children.toArray(this.props.children).join('');
     
     this.drawText(text);

@@ -3,8 +3,10 @@
 import React, { PropTypes } from 'react';
 import ThreeUIComponent from './ThreeUIComponent';
 import THREE from 'three';
+import TWEEN from 'tween.js';
 import { Object3D } from 'react-three';
 import computeLayout from 'css-layout';
+import Immutable from 'immutable';
 
 function buildStyleTree(node) {
   if (typeof node !== 'object' || !node.type) return null;
@@ -28,27 +30,45 @@ export default class UI extends ThreeUIComponent {
     height: PropTypes.number.isRequired,
     width: PropTypes.number.isRequired,
     position: PropTypes.instanceOf(THREE.Vector3),
-    rotation: PropTypes.instanceOf(THREE.Vector3),
+    rotation: PropTypes.instanceOf(THREE.Euler),
     scale: PropTypes.instanceOf(THREE.Vector3)
   };
   
   static defaultProps = {
     position: new THREE.Vector3(0, 0, 0),
-    rotation: new THREE.Vector3(0, 0, 0),    
+    rotation: new THREE.Euler(),
     scale: new THREE.Vector3(1, 1, 1)
   };
   
   static childContextTypes = {
-    ppu: PropTypes.number.isRequired
+    ppu: PropTypes.number.isRequired,
+    computeLayout: PropTypes.func.isRequired
   };
   
-  getChildContext() {
-    return {
-      ppu: this.props.ppu
+  constructor(props) {
+    super(props);
+    this.state = {
+      styleTree: buildStyleTree({
+        type: {
+          isThreeUIComponent: true
+        },
+        props: {
+          style: {
+            height: props.height,
+            width: props.width
+          },
+          children: props.children
+        }
+      })
     };
+    computeLayout(this.state.styleTree);
   }
   
-  render() {
+  animate(time) {
+    TWEEN.update(time);
+  }
+  
+  computeLayout() {
     const styleTree = buildStyleTree({
       type: {
         isThreeUIComponent: true
@@ -62,11 +82,23 @@ export default class UI extends ThreeUIComponent {
       }
     });
     computeLayout(styleTree);
-    const { layout } = styleTree;
+    this.setState({ styleTree });
+  }
+  
+  getChildContext() {
+    return {
+      ppu: this.props.ppu,
+      computeLayout: this.computeLayout.bind(this)
+    };
+  }
+  
+  render() {
+    const { layout, children: layoutChildren } = this.state.styleTree;
     const children = React.Children.map(this.props.children, (child, i) => {
         return React.cloneElement(child, {
-          parentCSS: styleTree,
-          css: styleTree.children[i]
+          parentLayout: Immutable.Map(layout),
+          layout: Immutable.Map(layoutChildren[i].layout),
+          layoutChildren: layoutChildren[i].children
         });
     });
     
